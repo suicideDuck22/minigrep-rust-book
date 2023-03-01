@@ -11,9 +11,12 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 }
 
 fn search<'a>(query: &str, content: &'a str) -> Vec<&'a str> {
+    let lower_query = query.to_lowercase();
     let mut line_matches: Vec<&str> = vec![];
+
     content.lines().for_each(|line| {
-        if line.contains(query) {
+        let lower_line = line.to_lowercase();
+        if lower_line.contains(&lower_query) {
             line_matches.push(line);
         }
     });
@@ -52,5 +55,13 @@ mod tests {
         let content = "\nRust:\nsafe, fast, productive.\nPick three.";
 
         assert_eq!(vec!["safe, fast, productive."], search(query, content));
+    }
+    
+    #[test]
+    fn multiple_lines_case_insensitive(){
+        let query = "prog";
+        let content = "It's not only writers who can benefit from this free online tool.\nIf you're a PROgrammer who's working on a project where blocks of text are needed, this tool can be a great way to get that.\nIt's a good way to test your PROgramming and that the tool being created is working well.";
+    
+        assert_eq!(vec!["If you're a PROgrammer who's working on a project where blocks of text are needed, this tool can be a great way to get that.", "It's a good way to test your PROgramming and that the tool being created is working well."], search(query, content));
     }
 }
