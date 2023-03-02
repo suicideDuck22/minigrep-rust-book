@@ -1,4 +1,4 @@
-use std::{fs, error::Error, vec, env, process::exit};
+use std::{fs, error::Error, vec, env};
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let file_content = fs::read_to_string(config.file_path)?;
