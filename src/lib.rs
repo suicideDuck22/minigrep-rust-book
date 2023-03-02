@@ -1,22 +1,26 @@
-use std::{fs, error::Error, vec};
+use std::{fs, error::Error, vec, env, process::exit};
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let file_content = fs::read_to_string(config.file_path)?;
 
-    for result_line in search(&config.query, &file_content){
-        println!("{result_line}");
+    let results = if config.ignore_case {
+        search_case_insensitive(&config.query, &file_content)
+    } else {
+        search_case_sensitive(&config.query, &file_content)
+    };
+
+    for line_result in results{
+        println!("{line_result}");
     }
 
     Ok(())
 }
 
-fn search<'a>(query: &str, content: &'a str) -> Vec<&'a str> {
-    let lower_query = query.to_lowercase();
+fn search_case_sensitive<'a>(query: &str, content: &'a str) -> Vec<&'a str> {
     let mut line_matches: Vec<&str> = vec![];
 
     content.lines().for_each(|line| {
-        let lower_line = line.to_lowercase();
-        if lower_line.contains(&lower_query) {
+        if line.contains(&query) {
             line_matches.push(line);
         }
     });
@@ -24,23 +28,68 @@ fn search<'a>(query: &str, content: &'a str) -> Vec<&'a str> {
     line_matches
 }
 
+fn search_case_insensitive<'a>(query: &str, content: &'a str) -> Vec<&'a str> {
+    let query = query.to_lowercase();
+    let mut line_matches: Vec<&str> = vec![];
+
+    content.lines().for_each(|line| {
+        if line.to_lowercase().contains(&query) {
+            line_matches.push(line);
+        }
+    });
+    
+    line_matches
+}
+
+struct ArgsTypes {
+    flags: Vec<String>,
+    params: Vec<String>
+}
+
+fn arguments_parser(args: &Vec<String>) -> Result<ArgsTypes, String> {
+    if args.len() < 3 {
+        return Err(format!("Is expected 2 arguments, but received {} arguments.", args.len() - 1));
+    }
+
+    if args.len() == 3 {
+        return Ok(ArgsTypes {
+            flags: vec![],
+            params: vec![args[1].clone(), args[2].clone()]
+        });
+    }
+
+    let slice_size_flags_args = args.len() - 2;
+    let flags_args: &[String] = &args[1..slice_size_flags_args];
+    let params_args: &[String] = &args[slice_size_flags_args..];
+    
+    Ok(ArgsTypes { flags: flags_args.to_vec(), params: params_args.to_vec() })
+    
+}
+
 pub struct Config {
     pub query: String,
-    pub file_path: String
+    pub file_path: String,
+    pub ignore_case: bool
 }
 
 impl Config {
-    pub fn build(args: &[String]) -> Result<Config, String> {
-        if args.len() < 3 {
-            return Err(format!("Is expected 2 arguments, but received {} arguments.", args.len() - 1));
+    pub fn build(args: &Vec<String>) -> Result<Config, String> {
+        let args: ArgsTypes = arguments_parser(&args)?;
+    
+        let query: String = args.params[0].clone();
+        let file_path: String = args.params[1].clone();
+        let ignore_case: bool;
+
+        if env::var("IGNORE_CASE").is_ok() || (!args.flags.is_empty() && args.flags.contains(&String::from("--ignore-case"))) {
+            ignore_case = true;
+        } else {
+            ignore_case = false;
         }
-    
-        let query: String = args[1].clone();
-        let file_path: String = args[2].clone();
-    
+
         Ok(Config {
             query,
-            file_path
+            file_path,
+            ignore_case
         })
     }
 }
@@ -50,18 +99,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_one_line(){
+    fn case_sensitive(){
         let query = "duct";
-        let content = "\nRust:\nsafe, fast, productive.\nPick three.";
+        let content = "\nRust:\nsafe, fast, productive.\nPick three.\nDuct tape.";
 
-        assert_eq!(vec!["safe, fast, productive."], search(query, content));
+        assert_eq!(vec!["safe, fast, productive."], search_case_sensitive(query, content));
     }
-    
+
     #[test]
-    fn multiple_lines_case_insensitive(){
-        let query = "prog";
-        let content = "It's not only writers who can benefit from this free online tool.\nIf you're a PROgrammer who's working on a project where blocks of text are needed, this tool can be a great way to get that.\nIt's a good way to test your PROgramming and that the tool being created is working well.";
-    
-        assert_eq!(vec!["If you're a PROgrammer who's working on a project where blocks of text are needed, this tool can be a great way to get that.", "It's a good way to test your PROgramming and that the tool being created is working well."], search(query, content));
-    }
+    fn case_insensitive(){
+        let query = "rUst";
+        let content = "\nRust:\nsafe, fast, productive.\nPick three.\nTrust me.";
+
+        assert_eq!(vec!["Rust:", "Trust me."], search_case_insensitive(query, content));
+    } 
 }

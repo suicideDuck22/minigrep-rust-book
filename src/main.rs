@@ -4,12 +4,12 @@ use minigrep::Config;
 fn main() {
     let args: Vec<String> = env::args().collect();
     let config = Config::build(&args).unwrap_or_else(|err| {
-        println!("{err}");
+        eprintln!("{err}");
         exit(1);
     });
 
     if let Err(error) = minigrep::run(config) {
-        println!("An error ocurred on reading the file: {error}");
+        eprintln!("An error ocurred on reading the file: {error}");
         exit(1)
     };
 }
